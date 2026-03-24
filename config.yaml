@@ -1,0 +1,33 @@
+# Posture detection parameters
+posture_prompt: >
+  Look at the person in this image. Rate their posture on a scale of 1 to 10,
+  where 1 is very poor (slouching, hunched back, forward head) and 10 is perfect
+  (upright spine, shoulders back, head aligned). Reply with only a number 1-10.
+
+bad_posture_threshold: 5.0       # Score below this triggers correction
+correction_cooldown_sec: 30      # Minimum seconds between corrections
+expression_hold_sec: 3.0         # How long to hold an expression
+head_nod_intensity: 0.15         # Amplitude of nod movement (radians)
+head_look_intensity: 0.2         # Amplitude of attention-draw movement (radians)
+
+# Camera settings
+camera_index: 0                  # Webcam index for user posture detection
+inference_interval_sec: 3.0      # Seconds between posture inferences
+
+# Reachy connection
+reachy_host: "localhost"         # Reachy Mini IP or hostname
+
+# Audio
+tts_bad_posture_messages:
+  - "Please sit up straight!"
+  - "Try to keep your back upright."
+  - "Remember to correct your posture."
+  - "Shoulders back, chin up!"
+
+tts_good_posture_message: "Great posture! Keep it up."
+
+# Expression analyzer (VLM check of Reachy's own expression)
+expression_check_enabled: true
+expression_prompt: >
+  Describe the facial expression of the robot in this image.
+  Is it happy, sad, concerned, or neutral? Reply with one word.
