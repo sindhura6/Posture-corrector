@@ -1,6 +1,6 @@
 # Posture Corrector — Reachy Mini + Moondream VLM + AutoResearch
 
-A posture correction system running on Mac Mini (Apple Silicon) that uses a locally hosted **Moondream2** vision-language model to detect posture, drives **Reachy Mini** facial expressions and head movements as corrective feedback, and runs **Karpathy's AutoResearch** overnight to automatically optimize detection prompts and robot behavior parameters.
+A posture correction system running on Mac Mini (Apple Silicon) that uses a locally hosted **Moondream2** vision-language model to detect posture, drives **Reachy Mini** facial expressions and head movements as corrective feedback, and runs an **autonomous AutoResearch loop** overnight — powered by a local **Qwen model via mlx-lm** — to automatically optimize detection prompts and thresholds.
 
 ---
 
@@ -18,7 +18,7 @@ Webcam → Moondream2 VLM → Posture Score
                     │
          VLM checks Reachy's expression (feedback loop)
                     │
-         AutoResearch reads val_score → optimizes config.yaml
+         Qwen (mlx-lm) reads val_score → optimizes config.yaml
 ```
 
 ---
@@ -39,25 +39,25 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 3. Run a timed training session (for AutoResearch)
+### 3. Collect training data (run once, ~30 min)
+
+Sit at your desk with natural posture variation. This labels webcam frames into `data/posture_dataset/`:
 
 ```bash
-python training/train.py --budget 300
+python training/collect_data.py
 ```
 
 ### 4. Run AutoResearch overnight optimization
 
-Clone Karpathy's AutoResearch, then point it at `training/train.py`:
+Starts a local Qwen model (via mlx-lm) that autonomously proposes config changes, evaluates them against your stored dataset, and commits improvements. First run downloads ~4 GB of model weights.
 
 ```bash
-git clone https://github.com/karpathy/autoresearch.git ../autoresearch
-python ../autoresearch/autoresearch.py \
-    --script training/train.py \
-    --metric val_score \
-    --budget 300
+python autoresearch_runner.py
+# or pick a different model:
+python autoresearch_runner.py --model mlx-community/Qwen2.5-7B-Instruct-4bit
 ```
 
-AutoResearch will run ~12 experiments/hour, automatically modifying `config.yaml` (prompts, thresholds, timing) and committing improvements to git.
+Runs indefinitely (Ctrl+C to stop). Results logged to `experiments/results.tsv`. No camera, no robot, no internet connection needed after the model downloads.
 
 ---
 
@@ -77,23 +77,26 @@ AutoResearch will run ~12 experiments/hour, automatically modifying `config.yaml
 
 ## AutoResearch Optimization Loop
 
-AutoResearch treats `training/train.py` as an experiment script and `config.yaml` as the tunable parameter space. Each experiment:
+`autoresearch_runner.py` runs a local **Qwen2.5-7B** model via **mlx-lm** on Apple Silicon. Each experiment:
 
-1. LLM reads `training/train.py` + `config.yaml` + past experiment git log
-2. Proposes a parameter change (e.g. tighten threshold, rephrase posture prompt)
-3. Runs a 5-minute correction session (`--budget 300`)
-4. Reads the printed `val_score: X.XX` line
-5. Commits to git if score improved; otherwise reverts
+1. Qwen reads `program.md` (protocol) + `config.yaml` + `experiments/results.tsv` (history)
+2. Proposes one config change with a hypothesis (e.g. tighten threshold, rephrase posture prompt)
+3. Change is committed to git
+4. `training/train.py` runs Moondream against the stored labeled dataset (no camera, no human)
+5. Reads the printed `val_score: X.XXXX` line
+6. Keeps the commit if score improved; `git revert` if not
+7. Loops forever until Ctrl+C
+
+All compute stays on Mac Mini — Qwen on Apple Silicon via MLX, Moondream on MPS.
 
 ### val_score formula
 
 ```
-val_score = correction_ack_rate − (0.5 × false_positive_rate) + (0.1 × expression_match_rate)
+val_score = 0.6 × sensitivity + 0.4 × specificity
 ```
 
-- **correction_ack_rate**: fraction of corrections followed by posture improvement within 30s
-- **false_positive_rate**: corrections triggered when posture was already good
-- **expression_match_rate**: VLM-verified Reachy expressions matched intended expression
+- **sensitivity**: fraction of bad-posture frames correctly detected (score < threshold)
+- **specificity**: fraction of good-posture frames correctly left alone (score ≥ threshold)
 
 ---
 
@@ -113,9 +116,13 @@ No Ollama server required. Inference runs fully locally.
 ## Project Structure
 
 ```
-├── main.py                    # Live runtime loop
-├── config.yaml                # Tunable parameters
+├── main.py                        # Live runtime loop
+├── config.yaml                    # Tunable parameters (AutoResearch target)
+├── program.md                     # AutoResearch protocol (read by Qwen each iteration)
+├── autoresearch_runner.py         # Qwen-powered overnight optimization loop
 ├── requirements.txt
+├── experiments/
+│   └── results.tsv                # Experiment history log (git-tracked)
 ├── src/
 │   ├── vision/
 │   │   ├── posture_detector.py    # Moondream posture scoring
@@ -130,8 +137,12 @@ No Ollama server required. Inference runs fully locally.
 │       ├── camera.py              # OpenCV frame capture
 │       └── logger.py              # Session JSONL logging
 ├── training/
-│   ├── train.py                   # AutoResearch target script
-│   └── metrics.py                 # val_score computation
+│   ├── collect_data.py            # One-time labeled dataset capture (user present)
+│   ├── train.py                   # Offline evaluator — runs Moondream on stored dataset
+│   └── metrics.py                 # val_score / sensitivity / specificity computation
 └── data/
+    ├── posture_dataset/           # Labeled frames from collect_data.py (gitignored)
+    │   ├── good/
+    │   └── bad/
     └── sessions/                  # Per-session posture logs (gitignored)
 ```

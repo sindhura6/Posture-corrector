@@ -1,12 +1,12 @@
 """
-AutoResearch training target script — OFFLINE dataset evaluation.
+Offline evaluator — runs Moondream against the stored labeled dataset.
 
-AutoResearch (github.com/karpathy/autoresearch) will:
-  1. Read this script + config.yaml
-  2. Propose config changes via LLM (prompts, thresholds, timing)
-  3. Run this script against the stored dataset in data/posture_dataset/
-  4. Read the printed 'val_score: X.XXXX' line to track improvement
-  5. Commit improvements to git if the score improves
+autoresearch_runner.py drives the optimization loop:
+  1. Reads program.md + config.yaml + experiments/results.tsv
+  2. Asks local Qwen model (via mlx-lm) to propose ONE config change
+  3. Commits the change, then runs this script
+  4. Reads the printed 'val_score: X.XXXX' line to track improvement
+  5. Keeps the commit if score improved; git-reverts otherwise
 
 No live camera, no human presence, no robot required during training.
 Run training/collect_data.py once (user present) to build the dataset first.
@@ -14,8 +14,8 @@ Run training/collect_data.py once (user present) to build the dataset first.
 Usage:
     python training/train.py [--config config.yaml]
 
-AutoResearch call:
-    python autoresearch.py --script training/train.py --metric val_score
+AutoResearch loop:
+    python autoresearch_runner.py
 """
 import argparse
 import logging
