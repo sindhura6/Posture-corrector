@@ -1,5 +1,6 @@
 moondream>=0.0.5
 mlx-lm>=0.21.0
+yt-dlp>=2024.1.0
 opencv-python>=4.9.0
 Pillow>=10.0.0
 pyyaml>=6.0

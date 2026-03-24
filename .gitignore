@@ -6,9 +6,10 @@ venv/
 dist/
 build/
 
-# Runtime data (don't commit session logs or dataset frames)
+# Runtime data (don't commit session logs, dataset frames, or downloaded videos)
 data/sessions/
 data/posture_dataset/
+data/youtube_tmp/
 # experiments/results.tsv IS tracked (experiment log); only ignore raw logs
 experiments/*.log
 
