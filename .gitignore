@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Runtime data (don't commit session logs or experiment data)
+data/sessions/
+experiments/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Model cache
+*.gguf
+*.safetensors
+.cache/
