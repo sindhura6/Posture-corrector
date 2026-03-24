@@ -1,29 +1,32 @@
 """
-AutoResearch training target script.
+AutoResearch training target script — OFFLINE dataset evaluation.
+
 AutoResearch (github.com/karpathy/autoresearch) will:
   1. Read this script + config.yaml
-  2. Propose config changes via LLM
-  3. Run this script for BUDGET_SECS seconds
-  4. Read the printed 'val_score: X.XX' line to track improvement
+  2. Propose config changes via LLM (prompts, thresholds, timing)
+  3. Run this script against the stored dataset in data/posture_dataset/
+  4. Read the printed 'val_score: X.XXXX' line to track improvement
   5. Commit improvements to git if the score improves
 
+No live camera, no human presence, no robot required during training.
+Run training/collect_data.py once (user present) to build the dataset first.
+
 Usage:
-    python training/train.py [--budget 300]
+    python training/train.py [--config config.yaml]
 
 AutoResearch call:
-    python autoresearch.py --script training/train.py --metric val_score --budget 300
+    python autoresearch.py --script training/train.py --metric val_score
 """
 import argparse
 import logging
 import sys
-import time
+from pathlib import Path
+
+import cv2
 import yaml
 
-from src.utils.camera import Camera
-from src.utils.logger import SessionLogger
 from src.vision.posture_detector import PostureDetector
-from src.robot.reachy_controller import ReachyController
-from training.metrics import compute_metrics
+from training.metrics import compute_offline_metrics
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -34,64 +37,70 @@ def load_config(path: str = "config.yaml") -> dict:
         return yaml.safe_load(f)
 
 
-def run_session(config: dict, budget_secs: float, session_id: str) -> str:
-    """Run a timed posture correction session. Returns the session log path."""
-    camera_index = config.get("camera_index", 0)
-    inference_interval = config.get("inference_interval_sec", 3.0)
-    bad_threshold = config.get("bad_posture_threshold", 5.0)
-    cooldown = config.get("correction_cooldown_sec", 30.0)
+def run_offline_eval(config: dict) -> dict:
+    """
+    Evaluate config against the stored labeled dataset.
+    Returns metrics dict including val_score.
+    No camera, no robot, no human required.
+    """
+    dataset_path = Path(config.get("dataset_path", "data/posture_dataset"))
+    good_dir = dataset_path / "good"
+    bad_dir = dataset_path / "bad"
 
-    reachy = ReachyController(config)
-    reachy.connect()
+    good_frames = sorted(good_dir.glob("*.jpg"))
+    bad_frames = sorted(bad_dir.glob("*.jpg"))
 
+    if not good_frames and not bad_frames:
+        print("ERROR: No dataset found. Run training/collect_data.py first.", file=sys.stderr)
+        print("val_score: 0.0000")
+        sys.exit(1)
+
+    threshold = config.get("bad_posture_threshold", 5.0)
     detector = PostureDetector(config)
 
-    log_path = f"data/sessions/{session_id}.jsonl"
+    # Good frames should score >= threshold (correctly left uncorrected)
+    good_correct = 0
+    for f in good_frames:
+        frame = cv2.imread(str(f))
+        if frame is None:
+            continue
+        score, _ = detector.detect(frame)
+        if score >= threshold:
+            good_correct += 1
 
-    with Camera(index=camera_index) as cam, SessionLogger(session_id) as slog:
-        last_correction_ts = 0.0
-        session_start = time.time()
+    # Bad frames should score < threshold (correctly triggers correction)
+    bad_correct = 0
+    for f in bad_frames:
+        frame = cv2.imread(str(f))
+        if frame is None:
+            continue
+        score, _ = detector.detect(frame)
+        if score < threshold:
+            bad_correct += 1
 
-        while time.time() - session_start < budget_secs:
-            frame = cam.capture()
-            if frame is None:
-                time.sleep(0.5)
-                continue
-
-            score, raw = detector.detect(frame)
-            slog.log_score(score, raw)
-
-            now = time.time()
-            if score < bad_threshold and (now - last_correction_ts) >= cooldown:
-                import random
-                msg = random.choice(config.get("tts_bad_posture_messages", ["Sit up straight!"]))
-                reachy.react_bad_posture(score)
-                slog.log_correction(score, msg)
-                last_correction_ts = now
-            elif score >= bad_threshold:
-                reachy.react_good_posture(score)
-
-            time.sleep(inference_interval)
-
-    reachy.disconnect()
-    return log_path
+    return compute_offline_metrics(
+        good_correct=good_correct,
+        good_total=len(good_frames),
+        bad_correct=bad_correct,
+        bad_total=len(bad_frames),
+    )
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--budget", type=int, default=300,
-                        help="Experiment duration in seconds (default: 300)")
     parser.add_argument("--config", default="config.yaml")
     args = parser.parse_args()
 
     config = load_config(args.config)
-    session_id = time.strftime("%Y%m%d_%H%M%S")
 
-    print(f"Starting {args.budget}s posture correction session ({session_id})")
-    log_path = run_session(config, float(args.budget), session_id)
+    dataset_path = Path(config.get("dataset_path", "data/posture_dataset"))
+    n_good = len(list((dataset_path / "good").glob("*.jpg")))
+    n_bad = len(list((dataset_path / "bad").glob("*.jpg")))
+    print(f"Evaluating against dataset: {n_good} good frames, {n_bad} bad frames")
 
-    metrics = compute_metrics(log_path)
-    print(f"\n--- Session Metrics ---")
+    metrics = run_offline_eval(config)
+
+    print("\n--- Offline Eval Metrics ---")
     for k, v in metrics.items():
         print(f"  {k}: {v}")
     # AutoResearch reads this line:
