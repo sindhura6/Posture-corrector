@@ -1,10 +1,50 @@
 """
 Evaluation metrics for AutoResearch experiment runs.
-Reads a session log and computes a composite val_score that AutoResearch maximizes.
+
+Two evaluation modes:
+  - compute_offline_metrics(): used by train.py — evaluates against stored dataset
+    (no camera/human needed, used for overnight AutoResearch optimization)
+  - compute_metrics(): used by main.py — reads live session JSONL logs
+    (requires user presence, useful for monitoring real sessions)
 """
 import json
-import time
 from pathlib import Path
+
+
+def compute_offline_metrics(
+    good_correct: int,
+    good_total: int,
+    bad_correct: int,
+    bad_total: int,
+) -> dict:
+    """
+    Compute offline classification metrics from dataset evaluation.
+    Used by training/train.py (AutoResearch target — no camera/human required).
+
+    Args:
+        good_correct: frames in good/ that scored >= threshold (true negatives)
+        good_total:   total frames in good/
+        bad_correct:  frames in bad/ that scored < threshold (true positives)
+        bad_total:    total frames in bad/
+
+    Returns:
+        dict with sensitivity, specificity, val_score (higher is better).
+    """
+    sensitivity = bad_correct / bad_total if bad_total > 0 else 0.0   # recall on bad posture
+    specificity = good_correct / good_total if good_total > 0 else 0.0  # recall on good posture
+
+    # Weighted: catching bad posture (sensitivity) matters more than avoiding false alarms
+    val_score = 0.6 * sensitivity + 0.4 * specificity
+
+    return {
+        "sensitivity": round(sensitivity, 4),
+        "specificity": round(specificity, 4),
+        "bad_correct": bad_correct,
+        "bad_total": bad_total,
+        "good_correct": good_correct,
+        "good_total": good_total,
+        "val_score": round(val_score, 4),
+    }
 
 
 def compute_metrics(session_path: str, ack_window_sec: float = 30.0) -> dict:

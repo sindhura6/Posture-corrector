@@ -6,8 +6,9 @@ venv/
 dist/
 build/
 
-# Runtime data (don't commit session logs or experiment data)
+# Runtime data (don't commit session logs, dataset frames, or experiment data)
 data/sessions/
+data/posture_dataset/
 experiments/
 
 # macOS

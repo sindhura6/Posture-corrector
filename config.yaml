@@ -31,3 +31,10 @@ expression_check_enabled: true
 expression_prompt: >
   Describe the facial expression of the robot in this image.
   Is it happy, sad, concerned, or neutral? Reply with one word.
+
+# Dataset (used by training/collect_data.py and training/train.py)
+# Phase 1: run collect_data.py once while sitting at your desk
+# Phase 2: run autoresearch overnight against the stored dataset (no human needed)
+dataset_path: data/posture_dataset/
+collect_interval_sec: 5          # Seconds between frame captures during collection
+collect_duration_sec: 1800       # 30-minute collection session (adjust as needed)
