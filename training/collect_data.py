@@ -5,8 +5,8 @@ Run this ONCE while sitting at your desk for ~30 minutes.
 It captures frames from your webcam, scores them with Moondream, and saves them
 into data/posture_dataset/good/ or data/posture_dataset/bad/ based on the threshold.
 
-After collection, run autoresearch overnight against the stored dataset:
-    python autoresearch.py --script training/train.py --metric val_score
+After collection, run the overnight optimization loop (local Qwen via mlx-lm):
+    python autoresearch_runner.py
 
 Usage:
     python training/collect_data.py [--config config.yaml] [--duration 1800]

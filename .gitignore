@@ -6,10 +6,11 @@ venv/
 dist/
 build/
 
-# Runtime data (don't commit session logs, dataset frames, or experiment data)
+# Runtime data (don't commit session logs or dataset frames)
 data/sessions/
 data/posture_dataset/
-experiments/
+# experiments/results.tsv IS tracked (experiment log); only ignore raw logs
+experiments/*.log
 
 # macOS
 .DS_Store
