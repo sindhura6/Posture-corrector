@@ -32,9 +32,14 @@ expression_prompt: >
   Describe the facial expression of the robot in this image.
   Is it happy, sad, concerned, or neutral? Reply with one word.
 
-# Dataset (used by training/collect_data.py and training/train.py)
-# Phase 1: run collect_data.py once while sitting at your desk
-# Phase 2: run autoresearch overnight against the stored dataset (no human needed)
+# Dataset (used by training/collect_data.py, training/collect_from_youtube.py, training/train.py)
+# Option A: python training/collect_from_youtube.py  (no camera, uses public YouTube videos)
+# Option B: python training/collect_data.py           (webcam, personalizes to your setup)
+# Phase 2:  python autoresearch_runner.py             (overnight optimization, no human needed)
 dataset_path: data/posture_dataset/
-collect_interval_sec: 5          # Seconds between frame captures during collection
-collect_duration_sec: 1800       # 30-minute collection session (adjust as needed)
+collect_interval_sec: 5          # Seconds between frame captures during webcam collection
+collect_duration_sec: 1800       # 30-minute webcam collection session (adjust as needed)
+
+# YouTube dataset collection (training/collect_from_youtube.py)
+youtube_frame_interval_sec: 2    # Extract one frame every N seconds from each video
+youtube_tmp_dir: data/youtube_tmp/  # Temp dir for downloaded videos (deleted after extraction)

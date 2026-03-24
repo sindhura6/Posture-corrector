@@ -39,9 +39,23 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 3. Collect training data (run once, ~30 min)
+### 3. Build training dataset
 
-Sit at your desk with natural posture variation. This labels webcam frames into `data/posture_dataset/`:
+**Option A — from YouTube (recommended, no camera needed):**
+
+Downloads public posture education videos, extracts frames, and auto-labels them with Moondream. No personal footage captured.
+
+```bash
+python training/collect_from_youtube.py
+# or supply your own URLs:
+python training/collect_from_youtube.py --urls "https://youtu.be/..." "https://youtu.be/..."
+```
+
+Videos are deleted after frame extraction. Frames saved to `data/posture_dataset/` (local only, never committed).
+
+**Option B — from your webcam (personalizes to your exact setup):**
+
+Sit at your desk for ~30 min with natural posture variation. Useful after Option A to add frames that match your specific camera angle and lighting.
 
 ```bash
 python training/collect_data.py
@@ -97,6 +111,23 @@ val_score = 0.6 × sensitivity + 0.4 × specificity
 
 - **sensitivity**: fraction of bad-posture frames correctly detected (score < threshold)
 - **specificity**: fraction of good-posture frames correctly left alone (score ≥ threshold)
+
+---
+
+## Data Privacy
+
+All data stays on your Mac Mini — nothing is uploaded or committed to git.
+
+| Location | Contents | Stored? |
+|---|---|---|
+| `data/posture_dataset/` | Labeled JPG frames | Local only (gitignored) |
+| `data/youtube_tmp/` | Downloaded videos | Deleted after extraction |
+| `data/sessions/` | Live session logs | Local only (gitignored) |
+| `experiments/results.tsv` | Metric scores + hypotheses | Git-tracked (no images) |
+
+- YouTube option uses **public** videos only — no personal footage
+- Webcam frames from `collect_data.py` are stored locally; delete anytime: `rm -rf data/posture_dataset/`
+- All Moondream and Qwen inference runs on-device via MPS/MLX — no cloud API calls
 
 ---
 
